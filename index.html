@@ -1438,7 +1438,7 @@ function buildBayHero(item) {
       (item.mileage ? '  ·  Mileage: ' + esc(item.mileage) : '') + '</div>' : '') +
     '<div class="inv-hero-foot">' +
       '<button class="cbtn red" onclick="printOneLabel(0)">Print Label</button>' +
-      '<button class="cbtn" onclick="copyVal('' + esc(item.controlNumber) + '','Control #')">Copy Control #</button>' +
+      '<button class="cbtn" onclick="copyVal(' + JSON.stringify(item.controlNumber) + ',' + JSON.stringify('Control #') + ')">Copy Control #</button>' +
     '</div>' +
   '</div>';
 }
@@ -1461,7 +1461,7 @@ function buildCard(item, idx) {
       fld('Dealer Code', item.dealerCode,    false) +
     '</div>' +
     '<div class="card-foot">' +
-      '<button class="cbtn" onclick="copyVal('' + esc(item.controlNumber) + '','Control #')">Copy Control #</button>' +
+      '<button class="cbtn" onclick="copyVal(' + JSON.stringify(item.controlNumber) + ',' + JSON.stringify('Control #') + ')">Copy Control #</button>' +
       '<button class="cbtn" onclick="toggleExpand(event,' + idx + ')">More</button>' +
       '<button class="cbtn red" onclick="printOneLabel(' + idx + ')">Label</button>' +
     '</div>' +
@@ -1493,8 +1493,7 @@ function buildInvTable(data) {
       '<td class="td-mono">'         + esc(item.invReceipt    || '--') + '</td>' +
       '<td class="td-mono">'         + esc(item.serial        || '--') + '</td>' +
       '<td>'                         + esc(item.dealerCode    || '--') + '</td>' +
-      '<td><button class="cbtn" onclick="event.stopPropagation();copyVal('' +
-        esc(item.controlNumber) + '','Control #')">Copy</button></td>' +
+      '<td><button class="cbtn" onclick="event.stopPropagation();copyVal(' + JSON.stringify(item.controlNumber) + ',' + JSON.stringify('Control #') + ');">Copy</button></td>' +
     '</tr>';
   });
   return html + '</tbody></table></div></div>';
