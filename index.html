@@ -1330,16 +1330,17 @@ function switchTab(tab) {
   var isInv = tab === 'inventory';
   document.getElementById('invTab').style.display  = isInv ? '' : 'none';
   document.getElementById('txnTab').style.display  = isInv ? 'none' : '';
-  document.getElementById('navInv').classList.toggle('active',  isInv);
-  document.getElementById('navTxn').classList.toggle('active', !isInv);
+  document.getElementById('tabBtnInv').classList.toggle('active',  isInv);
+  document.getElementById('tabBtnTxn').classList.toggle('active', !isInv);
   if (!isInv && !txnLoaded){ txnLoaded = true; loadTxnFilters(); }
 }
 
 function toggleTxnFilters() {
   var panel = document.getElementById('txnFilterCollapse');
   var arrow = document.getElementById('txnFilterArrow');
-  var open  = panel.classList.toggle('open');
-  arrow.textContent = open ? '-' : '+';
+  if (!panel) return;
+  var open = panel.classList.toggle('open');
+  if (arrow) arrow.textContent = open ? '-' : '+';
 }
 
 /* ============================================================
@@ -1369,8 +1370,8 @@ function invRun(query, limit) {
 
 function setInvView(v) {
   invView = v;
-  document.getElementById('vBtnCard') .classList.toggle('active', v === 'card');
-  document.getElementById('vBtnTable').classList.toggle('active', v === 'table');
+  document.getElementById('ivCard') .classList.toggle('active', v === 'card');
+  document.getElementById('ivTable').classList.toggle('active', v === 'table');
   invPaint(invResults, invLimit);
 }
 
@@ -1380,11 +1381,11 @@ function invRender(res) {
   var count  = res.count;
   if (isMobile || count === 1) invView = 'card';
   else if (count > 4)          invView = 'table';
-  document.getElementById('vBtnCard') .classList.toggle('active', invView === 'card');
-  document.getElementById('vBtnTable').classList.toggle('active', invView === 'table');
+  document.getElementById('ivCard') .classList.toggle('active', invView === 'card');
+  document.getElementById('ivTable').classList.toggle('active', invView === 'table');
   var meta = document.getElementById('invMetaBar');
   meta.style.display = count > 0 ? 'flex' : 'none';
-  document.getElementById('invResultLabel').textContent = count === 0 ? '' :
+  document.getElementById('invResultLbl').textContent = count === 0 ? '' :
     count === 1 ? '1 result' :
     count + ' results' + (count >= invLimit ? ' (showing ' + invLimit + ')' : '');
   document.getElementById('invPrintBtn').style.display = count > 0 ? '' : 'none';
@@ -1649,8 +1650,8 @@ function txnRun(limit) {
 
 function setTxnView(v) {
   txnView = v;
-  document.getElementById('tvBtnTable').classList.toggle('active', v === 'table');
-  document.getElementById('tvBtnCard') .classList.toggle('active', v === 'card');
+  document.getElementById('tvTable').classList.toggle('active', v === 'table');
+  document.getElementById('tvCard') .classList.toggle('active', v === 'card');
   txnPaint(txnResults, txnLimit);
 }
 
@@ -1667,11 +1668,11 @@ function txnRender(res) {
   txnResults = res.data;
   var count  = res.count;
   if (isMobile) txnView = 'card';
-  document.getElementById('tvBtnTable').classList.toggle('active', txnView === 'table');
-  document.getElementById('tvBtnCard') .classList.toggle('active', txnView === 'card');
+  document.getElementById('tvTable').classList.toggle('active', txnView === 'table');
+  document.getElementById('tvCard') .classList.toggle('active', txnView === 'card');
   var meta = document.getElementById('txnMetaBar');
   meta.style.display = count > 0 ? 'flex' : 'none';
-  document.getElementById('txnResultLabel').textContent = count === 0 ? '' :
+  document.getElementById('txnResultLbl').textContent = count === 0 ? '' :
     count + ' transaction' + (count !== 1 ? 's' : '') + (count >= txnLimit ? ' (showing ' + txnLimit + ')' : '');
   document.getElementById('txnExportBtn').style.display = count > 0 ? '' : 'none';
   if (count === 0){
