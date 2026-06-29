@@ -1695,13 +1695,13 @@ function txnPaint(data, count) {
 }
 
 function buildTxnTable(data) {
-  var html = '<div class="tbl-wrap"><div class="tbl-scroll"><table class="data-table">' +
+  var html = '<div class="tbl-wrap"><div class="tbl-scroll"><table class="data-tbl">' +
     '<thead><tr><th>Date</th><th>Dir</th><th>Customer</th><th>Item</th><th>Description</th>' +
     '<th>Qty</th><th>INV Receipt</th><th>LWHID</th><th>Lot #</th><th>Bill To Ref</th><th>Vendor</th><th>Location</th>' +
     '</tr></thead><tbody>';
   data.forEach(function(r){
     var dir    = (r.direction || '').toUpperCase();
-    var bdgCls = dir === 'IN' ? 'badge-in' : dir === 'OUT' ? 'badge-out' : 'badge-other';
+    var bdgCls = dir === 'IN' ? 'dir-badge in' : dir === 'OUT' ? 'dir-badge out' : 'dir-badge other';
     html += '<tr>' +
       '<td style="font-weight:600">' + esc(r.shippedDate     || '--') + '</td>' +
       '<td><span class="badge ' + bdgCls + '">' + esc(r.direction || '?') + '</span></td>' +
@@ -1723,7 +1723,7 @@ function buildTxnTable(data) {
 function buildTxnCard(txn) {
   var dir    = (txn.direction || '').toUpperCase();
   var dCls   = dir === 'IN' ? 'dir-in' : dir === 'OUT' ? 'dir-out' : '';
-  var bdgCls = dir === 'IN' ? 'badge-in' : dir === 'OUT' ? 'badge-out' : 'badge-other';
+  var bdgCls = dir === 'IN' ? 'dir-badge in' : dir === 'OUT' ? 'dir-badge out' : 'dir-badge other';
   return '<div class="txn-card ' + dCls + '">' +
     '<div class="txn-top">' +
       '<div>' +
