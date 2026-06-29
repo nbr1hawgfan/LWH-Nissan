@@ -842,7 +842,6 @@ function initPolyfill() {
 window.addEventListener('load', function() {
   isMobile = window.innerWidth < 600;
   loadStats();
-  loadLocations();
   initInvSearch();
 
   // Init BarcodeDetector synchronously
@@ -1316,26 +1315,12 @@ function initInvSearch() {
 ============================================================ */
 function loadStats() {
   api('getStats').then(function(s){
-    document.getElementById('navStats').innerHTML =
-      '<strong>' + Number(s.totalItems).toLocaleString() + '</strong> items synced ' + s.lastSync;
+    document.getElementById('headerStat').innerHTML =
+      '<strong>' + Number(s.invTotal).toLocaleString() + '</strong> items · synced ' + s.lastSync;
   }).catch(function(e){ console.warn('getStats failed:', e); });
 }
 
-function loadLocations() {
-  api('getLocations').then(function(locs){
-    var row = document.getElementById('locChips');
-    row.innerHTML = '';
-    locs.forEach(function(obj){
-      var chip = document.createElement('div');
-      chip.className = 'loc-chip' + (obj.loc === 'ALL' ? ' active' : '');
-      chip.dataset.loc = obj.loc;
-      chip.textContent = obj.loc === 'ALL' ? 'All Locations'
-        : obj.loc + (obj.count ? ' (' + obj.count + ')' : '');
-      chip.onclick = function(){ setLoc(obj.loc, chip); };
-      row.appendChild(chip);
-    });
-  }).catch(function(e) { console.warn('getLocations failed:', e); });
-}
+
 
 /* ============================================================
    TAB SWITCHING
@@ -1368,7 +1353,7 @@ function setLoc(loc, el) {
   if (q.length >= 2) invRun(q, invLimit);
 }
 
-function invClearSearch() {
+function invClear() {
   document.getElementById('invSearch').value = '';
   document.getElementById('invClear').classList.remove('visible');
   invShowHint();
@@ -1377,7 +1362,7 @@ function invClearSearch() {
 function invRun(query, limit) {
   invLastQuery = query; invLimit = limit;
   invShowLoading();
-  api('searchInventory', { query: query, location: invLoc, limit: limit })
+  api('searchInventory', { query: query, limit: limit })
     .then(invRender)
     .catch(function(e){ invShowError(e.message); });
 }
@@ -1430,33 +1415,30 @@ function invPaint(data, count) {
    BAY HERO
 ============================================================ */
 function buildBayHero(item) {
-  var isHold = item.holdStatus && item.holdStatus.toLowerCase() === 'yes';
-  var qty    = parseFloat(item.qty) || 0;
-  var qCls   = isHold ? 'hold' : (qty === 0 ? 'zero' : 'good');
-  var qLabel = isHold ? 'HOLD' : 'Qty ' + qty;
-  return '<div class="bay-hero-card">' +
-    '<div class="bay-hero-top">' +
+  return '<div class="inv-hero">' +
+    '<div class="inv-hero-band">' +
       '<div>' +
-        '<div class="bay-eyebrow">Bay Location</div>' +
-        '<div class="bay-value-giant">' + esc(item.bayLocation || '--') + '</div>' +
+        '<div class="hero-eyebrow">Bay Name</div>' +
+        '<div class="hero-bay">' + esc(item.bayName || '--') + '</div>' +
       '</div>' +
-      '<div class="bay-meta-right">' +
-        '<div class="qty-pill ' + qCls + '">' + esc(qLabel) + '</div>' +
-        '<div class="loc-pill">' + esc(item.location) + '</div>' +
+      '<div class="hero-right">' +
+        '<div class="hero-badge">' + esc(item.subCustNm || 'NISSAN') + '</div>' +
+        '<div class="hero-loc">' + esc(item.location) + '</div>' +
       '</div>' +
     '</div>' +
-    '<div class="bay-hero-body">' +
-      fld('Item',        item.item,            false) +
-      fld('LWH ID',     item.lwhId,            true)  +
-      fld('Customer ID',item.customerId,        true)  +
-      fld('PO / Lot',   item.poLot,            false) +
-      fld('Receipt',    item.inventoryReceipt, false) +
-      fld('Vendor',     item.vendor,           false) +
+    '<div class="inv-hero-body">' +
+      fld('Item',         item.itemNm,        false) +
+      fld('Control #',   item.controlNumber,  true)  +
+      fld('INV Receipt', item.invReceipt,     true)  +
+      fld('Chassis',     item.chasisNumber,   true)  +
+      fld('Serial',      item.serial,         true)  +
+      fld('Dealer Code', item.dealerCode,     false) +
     '</div>' +
-    (item.description ? '<div class="bay-hero-desc">' + esc(item.description) + '</div>' : '') +
-    '<div class="bay-hero-foot">' +
-      '<button class="card-btn blue" onclick="printOneLabel(0)">Print Label</button>' +
-      '<button class="card-btn" onclick="copyText(\'' + esc(item.lwhId) + '\')">Copy LWH ID</button>' +
+    (item.itemCategory ? '<div class="inv-hero-desc">Category: ' + esc(item.itemCategory) +
+      (item.mileage ? '  ·  Mileage: ' + esc(item.mileage) : '') + '</div>' : '') +
+    '<div class="inv-hero-foot">' +
+      '<button class="cbtn red" onclick="printOneLabel(0)">Print Label</button>' +
+      '<button class="cbtn" onclick="copyVal('' + esc(item.controlNumber) + '','Control #')">Copy Control #</button>' +
     '</div>' +
   '</div>';
 }
@@ -1465,36 +1447,31 @@ function buildBayHero(item) {
    MULTI CARD
 ============================================================ */
 function buildCard(item, idx) {
-  var isHold = item.holdStatus && item.holdStatus.toLowerCase() === 'yes';
-  var qty    = parseFloat(item.qty) || 0;
-  var sCls   = isHold ? 'status-hold' : (qty === 0 ? 'status-zero' : 'status-good');
-  var qCls   = isHold ? 'hold' : (qty === 0 ? 'zero' : '');
-  var qLabel = isHold ? 'HOLD' : 'Qty ' + qty;
-  return '<div class="inv-card ' + sCls + '" id="card-' + idx + '">' +
-    '<div class="card-row-top">' +
-      '<div class="card-bay">' + esc(item.bayLocation || '--') + '</div>' +
-      '<div class="card-right">' +
-        '<div class="qty-badge ' + qCls + '">' + esc(qLabel) + '</div>' +
-        '<div class="loc-tag">' + esc(item.location) + '</div>' +
-      '</div>' +
+  return '<div class="inv-card has-item" id="icard-' + idx + '">' +
+    '<div class="card-top">' +
+      '<div class="card-bay">' + esc(item.bayName || '--') + '</div>' +
+      '<div class="card-right"><div class="card-loc">' + esc(item.location) + '</div></div>' +
     '</div>' +
-    '<div class="card-item">' + esc(item.item || '--') + '</div>' +
-    (item.description ? '<div class="card-desc">' + esc(item.description) + '</div>' : '') +
+    '<div class="card-item-name">' + esc(item.itemNm || '--') + '</div>' +
+    (item.chasisNumber ? '<div class="card-chassis">Chassis: ' + esc(item.chasisNumber) + '</div>' : '') +
     '<div class="card-fields">' +
-      fld('LWH ID',      item.lwhId,           true)  +
-      fld('Customer ID', item.customerId,       true)  +
-      fld('PO / Lot',    item.poLot,           false) +
-      fld('Receipt',     item.inventoryReceipt,false) +
+      fld('Control #',   item.controlNumber, true) +
+      fld('INV Receipt', item.invReceipt,    true) +
+      fld('Serial',      item.serial,        true) +
+      fld('Dealer Code', item.dealerCode,    false) +
     '</div>' +
-    '<div class="card-footer">' +
-      '<button class="card-btn" onclick="copyText(\'' + esc(item.lwhId) + '\')">Copy LWH ID</button>' +
-      '<button class="card-btn" onclick="toggleExpand(event,' + idx + ')">More</button>' +
-      '<button class="card-btn blue" onclick="printOneLabel(' + idx + ')">Label</button>' +
+    '<div class="card-foot">' +
+      '<button class="cbtn" onclick="copyVal('' + esc(item.controlNumber) + '','Control #')">Copy Control #</button>' +
+      '<button class="cbtn" onclick="toggleExpand(event,' + idx + ')">More</button>' +
+      '<button class="cbtn red" onclick="printOneLabel(' + idx + ')">Label</button>' +
     '</div>' +
-    '<div class="card-expand" id="xp-' + idx + '">' +
-      fld('Sub Customer', item.subCust,           false) +
-      fld('Vendor',       item.vendor,            false) +
-      fld('Hold Status',  item.holdStatus || 'No',false) +
+    '<div class="card-expand-fields" id="ixp-' + idx + '">' +
+      fld('Vendor',      item.vendor,      false) +
+      fld('FCFS',        item.fcfs,        false) +
+      fld('Return Auth', item.returnAuth,  false) +
+      fld('Mileage',     item.mileage,     false) +
+      fld('Warehouse',   item.warehouse,   false) +
+      fld('Created On',  item.createdOn,   false) +
     '</div>' +
   '</div>';
 }
@@ -1503,23 +1480,21 @@ function buildCard(item, idx) {
    INVENTORY TABLE
 ============================================================ */
 function buildInvTable(data) {
-  var html = '<div class="tbl-wrap"><div class="tbl-scroll"><table class="data-table">' +
-    '<thead><tr><th>Bay</th><th>Loc</th><th>Item</th><th>Description</th>' +
-    '<th>LWH ID</th><th>Customer ID</th><th>Qty</th><th></th></tr></thead><tbody>';
-  data.forEach(function(item, idx){
-    var isHold = item.holdStatus && item.holdStatus.toLowerCase() === 'yes';
-    var qty    = parseFloat(item.qty) || 0;
-    var qCls   = isHold ? 'td-qty-hold' : (qty === 0 ? 'td-qty-zero' : 'td-qty-good');
-    var qLabel = isHold ? 'HOLD' : qty;
-    html += '<tr onclick="jumpToCard(' + idx + ')">' +
-      '<td class="td-bay">'          + esc(item.bayLocation || '--') + '</td>' +
-      '<td>'                         + esc(item.location)            + '</td>' +
-      '<td style="font-weight:600">' + esc(item.item || '--')        + '</td>' +
-      '<td class="td-desc">'         + esc(item.description || '--') + '</td>' +
-      '<td class="td-mono">'         + esc(item.lwhId)               + '</td>' +
-      '<td class="td-mono">'         + esc(item.customerId || '--')  + '</td>' +
-      '<td class="' + qCls + '">'    + qLabel                        + '</td>' +
-      '<td><button class="card-btn" onclick="event.stopPropagation();copyText(\'' + esc(item.lwhId) + '\')">Copy</button></td>' +
+  var html = '<div class="tbl-wrap"><div class="tbl-scroll"><table class="data-tbl">' +
+    '<thead><tr><th>Bay</th><th>Loc</th><th>Item</th><th>Chassis</th>' +
+    '<th>Control #</th><th>INV Receipt</th><th>Serial</th><th>Dealer Code</th><th></th></tr></thead><tbody>';
+  data.forEach(function(item, i) {
+    html += '<tr onclick="jumpToCard(' + i + ')">' +
+      '<td class="td-bay">'          + esc(item.bayName       || '--') + '</td>' +
+      '<td>'                         + esc(item.location)              + '</td>' +
+      '<td style="font-weight:600">' + esc(item.itemNm        || '--') + '</td>' +
+      '<td class="td-mono">'         + esc(item.chasisNumber  || '--') + '</td>' +
+      '<td class="td-mono">'         + esc(item.controlNumber)         + '</td>' +
+      '<td class="td-mono">'         + esc(item.invReceipt    || '--') + '</td>' +
+      '<td class="td-mono">'         + esc(item.serial        || '--') + '</td>' +
+      '<td>'                         + esc(item.dealerCode    || '--') + '</td>' +
+      '<td><button class="cbtn" onclick="event.stopPropagation();copyVal('' +
+        esc(item.controlNumber) + '','Control #')">Copy</button></td>' +
     '</tr>';
   });
   return html + '</tbody></table></div></div>';
@@ -1528,14 +1503,14 @@ function buildInvTable(data) {
 function jumpToCard(idx) {
   setInvView('card');
   setTimeout(function(){
-    var el = document.getElementById('card-' + idx);
+    var el = document.getElementById('icard-' + idx);
     if (el) el.scrollIntoView({ behavior:'smooth', block:'start' });
   }, 60);
 }
 
 function toggleExpand(e, idx) {
   if (e) e.stopPropagation();
-  var el = document.getElementById('xp-' + idx);
+  var el = document.getElementById('ixp-' + idx);
   if (el) el.classList.toggle('open');
 }
 
@@ -1553,32 +1528,29 @@ function openInvPrint(){ buildLabels(invResults); }
 function printOneLabel(idx){ buildLabels([invResults[idx]]); }
 
 function buildLabels(items) {
-  var q = document.getElementById('invSearch').value;
   document.getElementById('invLabelSub').textContent =
-    '"' + q + '" - ' + items.length + ' label' + (items.length !== 1 ? 's' : '') +
-    ' - ' + new Date().toLocaleDateString();
+    items.length + ' label' + (items.length !== 1 ? 's' : '') + ' · ' + new Date().toLocaleDateString();
   var html = '';
-  items.forEach(function(item){
+  items.forEach(function(item) {
     if (!item) return;
     html += '<div class="label-card">' +
-      '<div class="label-bay">'   + esc(item.bayLocation || '--') + '</div>' +
-      '<div class="label-loc">'   + esc(item.location)            + '</div>' +
-      '<svg class="label-barcode" id="bc-' + esc(item.lwhId) + '"></svg>' +
-      '<div class="label-lwhid">' + esc(item.lwhId)              + '</div>' +
-      '<div class="label-item">'  + esc(item.item)                + '</div>' +
-      (item.description ? '<div class="label-desc">' + esc(item.description) + '</div>' : '') +
-      '<div class="label-qty">Qty: ' + (parseFloat(item.qty) || 0) + '</div>' +
+      '<div class="label-bay">'  + esc(item.bayName || '--')         + '</div>' +
+      '<div class="label-sub">'  + esc(item.subCustNm || 'NISSAN')   + '</div>' +
+      '<svg class="label-bc" id="lbc-' + esc(item.controlNumber) + '"></svg>' +
+      '<div class="label-ctrl">' + esc(item.controlNumber)           + '</div>' +
+      '<div class="label-item">' + esc(item.itemNm)                  + '</div>' +
+      (item.chasisNumber ? '<div class="label-item">Chassis: ' + esc(item.chasisNumber) + '</div>' : '') +
     '</div>';
   });
   document.getElementById('labelGrid').innerHTML = html;
-  document.getElementById('invLabelOverlay').classList.add('open');
+  document.getElementById('invLabelsOverlay').classList.add('open');
   setTimeout(function(){
     items.forEach(function(item){
-      if (!item || !item.lwhId) return;
-      var el = document.getElementById('bc-' + item.lwhId);
+      if (!item || !item.controlNumber) return;
+      var el = document.getElementById('lbc-' + item.controlNumber);
       if (!el) return;
-      try { JsBarcode(el, item.lwhId, { format:'CODE128', width:1.8, height:45, displayValue:false, margin:2 }); }
-      catch(e){ el.style.display = 'none'; }
+      try { JsBarcode(el, item.controlNumber, { format:'CODE128', width:1.8, height:44, displayValue:false, margin:2 }); }
+      catch(e){ el.style.display='none'; }
     });
   }, 100);
 }
@@ -1611,56 +1583,37 @@ function printInvLabels() {
    TRANSACTION FILTERS
 ============================================================ */
 function loadTxnFilters() {
-  api('getTxnSubCustomers').then(function(list){
-    var row = document.getElementById('txnCustChips');
+  // Load direction chips
+  api('getDirections').then(function(dirs) {
+    var row = document.getElementById('dirChips');
     row.innerHTML = '';
-    list.forEach(function(obj){
+    dirs.forEach(function(dir) {
       var chip = document.createElement('div');
-      chip.className = 'loc-chip' + (obj.name === 'ALL' ? ' active' : '');
-      chip.textContent = obj.name === 'ALL' ? 'All Customers'
-        : obj.name + (obj.count ? ' (' + obj.count + ')' : '');
-      chip.onclick = function(){
-        document.querySelectorAll('#txnCustChips .loc-chip').forEach(function(c){ c.classList.remove('active'); });
-        chip.classList.add('active'); txnCust = obj.name; txnRun(100);
-      };
-      row.appendChild(chip);
-    });
-  }).catch(function(e) { console.warn('getTxnSubCustomers failed:', e); });
-
-  api('getTxnDirections').then(function(dirs){
-    var row = document.getElementById('txnDirChips');
-    row.innerHTML = '';
-    dirs.forEach(function(dir){
-      var chip = document.createElement('div');
-      chip.className = 'loc-chip' + (dir === 'ALL' ? ' active' : '');
+      chip.className = 'fchip' + (dir === 'ALL' ? ' active' : '');
       chip.textContent = dir === 'ALL' ? 'All Directions' : dir;
-      chip.onclick = function(){
-        document.querySelectorAll('#txnDirChips .loc-chip').forEach(function(c){ c.classList.remove('active'); });
-        chip.classList.add('active'); txnDir = dir; txnRun(100);
+      chip.onclick = function() {
+        document.querySelectorAll('#dirChips .fchip').forEach(function(c){ c.classList.remove('active'); });
+        chip.classList.add('active');
+        txnDir = dir;
+        txnRun(100);
       };
       row.appendChild(chip);
     });
-  }).catch(function(e) { console.warn('getTxnDirections failed:', e); });
+  }).catch(function(e){ console.warn('getDirections failed:', e); });
 
+  // Wire up transaction search input
   var si = document.getElementById('txnSearch');
-  si.addEventListener('focus', function(){ startDashWatch(si); });
-  si.addEventListener('blur', function(){
-    stopDashWatch(); stripDashes(si);
-    setTimeout(function(){ stripDashes(si); }, 50);
-    setTimeout(function(){ stripDashes(si); }, 200);
-    setTimeout(function(){ stripDashes(si); }, 500);
-  });
-  si.addEventListener('input', function(){
-    var v = si.value.replace(/-/g,'');
+  si.addEventListener('input', function() {
+    var v = si.value;
     document.getElementById('txnClear').classList.toggle('visible', v.length > 0);
     clearTimeout(txnTimer);
     txnTimer = setTimeout(function(){ txnRun(100); }, 380);
   });
-  document.getElementById('txnDateFrom').addEventListener('change', function(){ txnRun(100); });
-  document.getElementById('txnDateTo').addEventListener('change',   function(){ txnRun(100); });
+  document.getElementById('dateFrom').addEventListener('change', function(){ txnRun(100); });
+  document.getElementById('dateTo').addEventListener('change',   function(){ txnRun(100); });
 }
 
-function txnClearSearch() {
+function txnClear() {
   document.getElementById('txnSearch').value = '';
   document.getElementById('txnClear').classList.remove('visible');
   document.getElementById('txnMetaBar').style.display = 'none';
@@ -1679,8 +1632,8 @@ function txnRun(limit) {
     query:     document.getElementById('txnSearch').value.trim(),
     subCust:   txnCust === 'ALL' ? '' : txnCust,
     direction: txnDir,
-    dateFrom:  document.getElementById('txnDateFrom').value,
-    dateTo:    document.getElementById('txnDateTo').value,
+    dateFrom:  document.getElementById('dateFrom').value,
+    dateTo:    document.getElementById('dateTo').value,
     limit:     limit
   };
   document.getElementById('txnResults').innerHTML =
@@ -1894,9 +1847,9 @@ function downloadTxnCSV() {
 ============================================================ */
 function closeOverlay(id){ document.getElementById(id).classList.remove('open'); }
 
-function copyText(val) {
-  if (navigator.clipboard){
-    navigator.clipboard.writeText(val).then(function(){ showToast('Copied: ' + val); });
+function copyText(val, label) {
+  if (navigator.clipboard) {
+    navigator.clipboard.writeText(val).then(function(){ showToast('Copied ' + label + ': ' + val); });
   } else {
     var ta = document.createElement('textarea');
     ta.value = val; document.body.appendChild(ta); ta.select();
@@ -1935,6 +1888,17 @@ function fmtDate(d) {
   return d.getFullYear() + '-' +
     String(d.getMonth()+1).padStart(2,'0') + '-' +
     String(d.getDate()).padStart(2,'0');
+}
+
+function copyVal(val, label) {
+  if (navigator.clipboard) {
+    navigator.clipboard.writeText(val).then(function(){ showToast('Copied ' + label + ': ' + val); });
+  } else {
+    var ta = document.createElement('textarea');
+    ta.value = val; document.body.appendChild(ta); ta.select();
+    document.execCommand('copy'); document.body.removeChild(ta);
+    showToast('Copied: ' + val);
+  }
 }
 </script>
 </body>
