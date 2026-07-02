@@ -264,6 +264,24 @@ canvas#scanPreview { position:absolute; top:0; left:0; width:100%; height:100%; 
   #printRoot { display:block !important; position:static; width:100%; }
 }
 #printRoot { display:none; }
+
+
+
+
+
+
+/* ===================== USER PICKER ===================== */
+.user-picker-bg { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.7); z-index:600; align-items:center; justify-content:center; }
+.user-picker-bg.open { display:flex; }
+.user-picker { background:#fff; border-radius:12px; padding:24px 20px 20px; width:min(320px,90vw); box-shadow:0 8px 40px rgba(0,0,0,0.3); }
+.user-picker h2 { font-size:16px; font-weight:800; color:#111; margin-bottom:4px; }
+.user-picker p  { font-size:12px; color:#666; margin-bottom:16px; }
+.user-picker select { width:100%; padding:11px 12px; font-size:15px; border:1.5px solid #ddd; border-radius:6px; color:#111; outline:none; margin-bottom:14px; background:#fff; }
+.user-picker select:focus { border-color:var(--red, #2563EB); }
+.user-picker-btn { width:100%; padding:13px; background:var(--red, #2563EB); color:#fff; border:none; border-radius:6px; font-size:15px; font-weight:700; cursor:pointer; }
+.user-chip { font-size:11px; color:#888; padding:3px 0; }
+.user-chip strong { color:#111; }
+.user-change { background:none; border:none; color:var(--red, #2563EB); font-size:11px; cursor:pointer; text-decoration:underline; margin-left:6px; }
 </style>
 </head>
 <body>
@@ -279,6 +297,7 @@ canvas#scanPreview { position:absolute; top:0; left:0; width:100%; height:100%; 
       </div>
     </div>
     <div class="hdr-stat" id="hdrStat"></div>
+    <div id="userChip" style="flex-shrink:0"></div>
     <div class="hdr-tabs">
       <button class="hdr-tab active" id="tabInv" onclick="switchTab('inv')">Inventory</button>
       <button class="hdr-tab"        id="tabTxn" onclick="switchTab('txn')">Transactions</button>
@@ -373,6 +392,27 @@ canvas#scanPreview { position:absolute; top:0; left:0; width:100%; height:100%; 
 </div><!-- /content -->
 
 <div class="toast" id="toast"></div>
+
+
+<!-- USER PICKER -->
+<div class="user-picker-bg" id="userPickerBg">
+  <div class="user-picker">
+    <h2>Who are you?</h2>
+    <p>Select your name so we can track app usage. This only appears once.</p>
+    <select id="userSelect">
+      <option value="">— Select your name —</option>
+      <option>Tim Jennings</option>
+      <option>Ronnie</option>
+      <option>Doug</option>
+      <option>Chris Morland</option>
+      <option>Derek Dixon</option>
+      <option>Other Manager</option>
+      <option>Other Director</option>
+      <option>Warehouse Staff</option>
+    </select>
+    <button class="user-picker-btn" onclick="saveUser()">Continue</button>
+  </div>
+</div>
 
 <!-- SCAN MODAL -->
 <div class="scan-bg" id="scanBg">
@@ -493,6 +533,7 @@ var isMobile     = window.innerWidth < 600;
 ============================================================ */
 window.addEventListener('load', function() {
   isMobile = window.innerWidth < 600;
+  initUser();
 
   // Load header stats
   api('getStats').then(function(s) {
@@ -745,7 +786,8 @@ function printLabels() {
     '.label-bc{width:100%;margin:3px 0;}' +
     '.label-ctrl{font-size:10px;font-family:monospace;font-weight:700;color:#111;margin-top:2px;}' +
     '.label-item{font-size:8px;color:#555;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}' +
-    '@media print{@page{margin:10mm;} body{margin:0;}}</style></head><body>' +
+    '@media print{@page{margin:10mm;} body{margin:0;}}' +
+    '</style></head><body>' +
     '<div class="label-grid">' + grid.innerHTML + '</div></body></html>');
   w.document.close();
   setTimeout(function(){ w.focus(); w.print(); }, 500);
@@ -959,7 +1001,8 @@ function printExport() {
     'thead th{background:#111;color:#fff;padding:6px 9px;text-align:left;font-size:9px;text-transform:uppercase;white-space:nowrap;}' +
     'tbody td{padding:5px 9px;border-bottom:1px solid #eee;white-space:nowrap;}' +
     'tbody tr:nth-child(even) td{background:#f8f8f8;}' +
-    '@media print{@page{margin:10mm;size:landscape;} body{margin:0;} thead th{-webkit-print-color-adjust:exact;print-color-adjust:exact;}}</style></head><body>' +
+    '@media print{@page{margin:10mm;size:landscape;} body{margin:0;} thead th{-webkit-print-color-adjust:exact;print-color-adjust:exact;}}' +
+    '</style></head><body>' +
     '<h2>Nissan Transaction Export</h2><p>' + sub + '</p>' +
     '<table><thead><tr>' + cols.map(function(c){ return '<th>'+c+'</th>'; }).join('') + '</tr></thead><tbody>' +
     rows + '</tbody></table></body></html>');
@@ -983,6 +1026,45 @@ function downloadCSV() {
   a.href = URL.createObjectURL(blob);
   a.download = 'nissan_txn_' + fmtDate(new Date()) + '.csv';
   a.click();
+}
+
+
+/* ============================================================
+   USER IDENTIFICATION
+   One-time prompt, stored in localStorage
+============================================================ */
+var CURRENT_USER = '';
+
+function initUser() {
+  CURRENT_USER = localStorage.getItem('lwh_user') || '';
+  if (!CURRENT_USER) {
+    document.getElementById('userPickerBg').classList.add('open');
+  } else {
+    showUserChip();
+  }
+}
+
+function saveUser() {
+  var sel = document.getElementById('userSelect').value;
+  if (!sel) { alert('Please select your name'); return; }
+  CURRENT_USER = sel;
+  localStorage.setItem('lwh_user', sel);
+  document.getElementById('userPickerBg').classList.remove('open');
+  showUserChip();
+}
+
+function changeUser() {
+  document.getElementById('userSelect').value = '';
+  document.getElementById('userPickerBg').classList.add('open');
+}
+
+function showUserChip() {
+  // Show current user in nav if element exists
+  var el = document.getElementById('userChip');
+  if (el) {
+    el.innerHTML = '<span class="user-chip">Signed in as <strong>' +
+      esc(CURRENT_USER) + '</strong><button class="user-change" onclick="changeUser()">change</button></span>';
+  }
 }
 
 /* ============================================================
